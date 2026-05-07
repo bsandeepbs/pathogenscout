@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+.ipynb_checkpoints/
+data/output_packets/*.json
+!data/output_packets/.gitkeep
+data/sample_tiles/*.npz
+!data/sample_tiles/.gitkeep
+.DS_Store
