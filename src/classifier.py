@@ -43,15 +43,27 @@ class PathogenClassifier:
             )
             self.input_name = self.session.get_inputs()[0].name
 
-    def predict(self, roi: np.ndarray) -> Classification:
-        """roi: HxWxC float32 in [0, 1]. Returns Classification."""
+    def predict(
+        self,
+        roi: np.ndarray,
+        ndre_patch: np.ndarray | None = None,
+    ) -> Classification:
+        """Classify the ROI.
+
+        Args:
+            roi: HxWxC float32 in [0, 1] — ready for the ONNX model.
+            ndre_patch: optional un-normalized NDRE values from the original
+                tile (same spatial region as roi). Used by the heuristic
+                fallback to recover absolute NDRE scale lost during
+                min-max normalization. Ignored when ONNX is available.
+        """
         if self.session is not None:
             tensor = roi.transpose(2, 0, 1)[None, ...].astype(np.float32)
             logits = self.session.run(None, {self.input_name: tensor})[0][0]
             probs = _softmax(logits)
             backend = "onnx-int8"
         else:
-            probs = self._heuristic(roi)
+            probs = self._heuristic(roi, ndre_patch)
             backend = "heuristic"
 
         idx = int(np.argmax(probs))
@@ -62,23 +74,38 @@ class PathogenClassifier:
             backend=backend,
         )
 
-    def _heuristic(self, roi: np.ndarray) -> np.ndarray:
-        """Fallback: separate drought from pathogen via red-edge variance.
+    def _heuristic(
+        self,
+        roi: np.ndarray,
+        ndre_patch: np.ndarray | None,
+    ) -> np.ndarray:
+        """Fallback: separate drought from pathogen via red-edge texture.
 
-        Pathogens produce *patchy* red-edge collapse (high local variance);
-        drought produces *uniform* depression (low variance). This is a
-        well-documented agronomic discriminator and is a reasonable stand-in
-        when the trained model is not bundled in the repo.
+        Agronomic discriminators:
+          • Pathogens → *patchy* red-edge collapse: bimodal NDRE,
+            high spatial variance, mixed stressed + healthy pixels.
+          • Drought   → *uniform* red-edge depression: unimodal NDRE,
+            low variance, the whole ROI is depressed.
+          • Healthy   → high mean NDRE with low variance.
+
+        Uses the un-normalized NDRE patch when available (preserves absolute
+        scale); falls back to ROI-derived NDRE otherwise.
         """
-        red, _nir, redge = roi[..., 0], roi[..., 1], roi[..., 2]
-        ndre_like = (redge - red) / np.maximum(redge + red, 1e-6)
-        mean_ndre = float(ndre_like.mean())
-        var_ndre = float(ndre_like.var())
+        if ndre_patch is not None and ndre_patch.size:
+            ndre = ndre_patch
+        else:
+            red, _nir, redge = roi[..., 0], roi[..., 1], roi[..., 2]
+            ndre = (redge - red) / np.maximum(redge + red, 1e-6)
 
-        # Map signals to logits, then softmax.
-        healthy_logit = 4.0 * mean_ndre - 1.0
-        drought_logit = -3.0 * mean_ndre + 0.5 - 8.0 * var_ndre
-        pathogen_logit = -2.5 * mean_ndre + 18.0 * var_ndre + 0.2
+        mean_ndre = float(ndre.mean())
+        ndre_std = float(ndre.std())
+        stressed_frac = float((ndre < 0.20).mean())
+
+        # Logits — high mean NDRE → healthy; high stressed_frac with low std → drought;
+        # high stressed_frac with high std → pathogen (mix of healthy + collapsed pixels).
+        healthy_logit  = 6.0 * mean_ndre - 1.0
+        drought_logit  = 5.0 * stressed_frac - 12.0 * ndre_std + 0.5
+        pathogen_logit = 3.0 * stressed_frac + 14.0 * ndre_std - 1.0
         return _softmax(np.array([healthy_logit, drought_logit, pathogen_logit]))
 
 

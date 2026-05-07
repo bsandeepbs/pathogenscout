@@ -3,6 +3,20 @@
 > **Agentic on-board satellite intelligence for pre-visual crop biosecurity threat detection.**
 > Built for the **DPhi SimSat Hackathon — General AI Track**.
 
+![Pathogen Scout — orbit-pass demo](docs/assets/demo.gif)
+
+> *15-second loop of the on-board agent streaming an 8-tile orbit pass: NDRE sentinel → INT8 classifier → JSON Tactical Packet. Replace `docs/assets/demo.gif` with your own recording — see [docs/RECORDING_GIF.md](docs/RECORDING_GIF.md).*
+
+### 🚀 30-second demo
+
+```bash
+pip install -r requirements.txt
+python -m src.demo_cli                 # Rich-formatted CLI (the "flight software" view)
+streamlit run src/dashboard.py         # Mission Control dashboard (browser)
+```
+
+The CLI auto-synthesizes 8 demo tiles on first run, so it works immediately on a fresh clone.
+
 ---
 
 ## 🌍 The Problem
@@ -20,16 +34,16 @@ For crop pathogens (e.g., wheat rust, citrus greening), **48 hours of latency = 
 
 **Pathogen Scout flips the model: think on-orbit, transmit only decisions.**
 
-| Conventional Pipeline | Pathogen Scout (Agentic Edge) |
-|-----------------------|-------------------------------|
-| Downlink ~1 GB raw tile | Downlink ~2 KB JSON Tactical Packet |
-| Latency: 6–48 hours | Latency: < 90 seconds |
-| Ground-side analysis | On-board three-tier agent |
-| Captures everything, decides later | **Decides in orbit, captures attention only when it matters** |
+| Metric                       | Standard Downlink            | **Pathogen Scout**                            | Δ                          |
+|------------------------------|------------------------------|-----------------------------------------------|----------------------------|
+| Data transmitted per anomaly | ~8 MB compressed tile        | **~1.2 KB JSON Tactical Packet**              | **>6,500× smaller**        |
+| Latency to actionable alert  | 6–48 hours (ground pipeline) | **< 90 seconds (on-board)**                   | ~3 orders of magnitude     |
+| Decision authority           | Human ground operator        | **Autonomous three-tier agent**               | No-human-in-loop over ocean |
+| Output                       | Raw pixels for re-analysis   | **Drone-tasking command + GPS**               | Decision-grade, not data    |
 
-### 📉 Bandwidth Savings: ~99.9998% reduction in data transmission
+### 📉 Bandwidth headline: ~99.985% reduction per detection
 
-A 1024×1024×4-band uint16 tile is ≈ **8 MB** compressed. A Tactical Packet — GPS coordinates, disease probability, classifier confidence, and a drone-command string — is **under 2 KB**. That is a **>4000× reduction**, freeing the downlink budget for the *truly* anomalous events.
+A 1024×1024 four-band float32 tile is ≈ **16 MB** uncompressed (≈ 8 MB compressed). A Tactical Packet — GPS coordinates, disease probability, classifier confidence, and a drone-command string — is **under 2 KB**. That is a **>4,000× reduction**, freeing the downlink budget for the *truly* anomalous events. The CLI demo prints the exact ratio for your run.
 
 ### 🚀 Why Edge Compute Is Not Optional In Space
 
@@ -83,16 +97,21 @@ pathogenscout/
 ├── src/
 │   ├── __init__.py
 │   ├── agent_logic.py          # Orchestrates Tier 1 → Tier 3
+│   ├── demo_cli.py             # Rich-formatted streaming "flight software" demo
+│   ├── dashboard.py            # Streamlit Mission Control dashboard
 │   ├── multispectral.py        # NDRE computation (NumPy/OpenCV)
 │   ├── classifier.py           # ONNX INT8 MobileNetV3 wrapper
 │   ├── dispatcher.py           # Tactical Packet builder
 │   └── config.py               # Thresholds, paths, constants
 ├── models/
-│   └── pathogen_classifier_int8.onnx   # Quantized weights
+│   └── pathogen_classifier_int8.onnx   # Quantized weights (drop your own)
 ├── notebooks/
 │   └── 01_ndre_exploration.ipynb
+├── docs/
+│   ├── RECORDING_GIF.md        # How to record the README demo GIF
+│   └── assets/                 # demo.gif, screenshots
 ├── data/
-│   ├── sample_tiles/           # Example Sentinel-2 inputs
+│   ├── sample_tiles/           # Example Sentinel-2 inputs (auto-generated)
 │   └── output_packets/         # Generated Tactical Packets
 └── tests/
     └── test_agent_logic.py
@@ -104,10 +123,18 @@ pathogenscout/
 
 ```bash
 pip install -r requirements.txt
-python -m src.agent_logic --tile data/sample_tiles/demo_tile.npz
+
+# 1. Streaming CLI demo (the "flight software" experience — record this for your GIF)
+python -m src.demo_cli
+
+# 2. Mission Control dashboard (browser, side-by-side comparison view)
+streamlit run src/dashboard.py
+
+# 3. Single-tile pipeline (programmatic / scriptable)
+python -m src.agent_logic --tile data/sample_tiles/tile_005_pathogen.npz --verbose
 ```
 
-Output is written to `data/output_packets/packet_<timestamp>.json`.
+Tactical Packets are written to `data/output_packets/packet_<id>.json`.
 
 ---
 

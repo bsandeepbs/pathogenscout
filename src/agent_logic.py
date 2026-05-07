@@ -69,7 +69,16 @@ class PathogenScoutAgent:
         roi = crop_roi(
             bands, smap.centroid_yx, size=config.CLASSIFIER_INPUT_SIZE,
         )
-        result = self.classifier.predict(roi)
+        # Extract un-normalized NDRE patch around the centroid for the
+        # heuristic fallback (the ONNX backend ignores this).
+        cy, cx = smap.centroid_yx
+        h, w = smap.ndre.shape
+        half = 64
+        y0, y1 = max(0, cy - half), min(h, cy + half)
+        x0, x1 = max(0, cx - half), min(w, cx + half)
+        ndre_patch = smap.ndre[y0:y1, x0:x1]
+
+        result = self.classifier.predict(roi, ndre_patch=ndre_patch)
         log.info("[T2] verdict=%s  confidence=%.3f", result.label, result.confidence)
         return result
 
