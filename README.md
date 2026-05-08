@@ -88,6 +88,25 @@ A 1024×1024 four-band float32 tile is ≈ **16 MB** uncompressed (≈ 8 MB comp
 
 ---
 
+## 🌐 Ground Segment — Where The Packets Land
+
+A satellite that emits decisions only matters if those decisions reach an operator. Pathogen Scout's Tactical Packets are deliberately schema-stable, ground-station-friendly JSON so they can be **ingested by any aerial-monitoring dashboard** — no bespoke decoder required.
+
+The companion ground surface for this project is **[MonitorFromSky](https://monitorfromsky.com/)** — *Asset Intelligence from Above*. The flow looks like this:
+
+```
+   ON-ORBIT                                       GROUND
+   ────────                                       ──────
+   Pathogen Scout ──► Tactical Packet ──► Downlink ──► MonitorFromSky
+   (3-tier agent)     (~1 KB JSON)        (10-min window)   (asset intelligence dashboard)
+```
+
+This turns Pathogen Scout into one half of a deployable space-to-ground pipeline: the satellite decides *what is worth telling the ground*, and the ground dashboard aggregates those decisions across many orbit passes into actionable asset intelligence. The same packet schema would slot into any operator's ingestion endpoint, but **MonitorFromSky** is the one purpose-built for "above" data.
+
+> The Tactical Packet is the contract. Pathogen Scout fulfills it from orbit. MonitorFromSky consumes it on the ground.
+
+---
+
 ## 📁 Repository Structure
 
 ```
