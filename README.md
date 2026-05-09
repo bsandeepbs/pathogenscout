@@ -88,6 +88,26 @@ A 1024×1024 four-band float32 tile is ≈ **16 MB** uncompressed (≈ 8 MB comp
 
 ---
 
+## 🌾 Use Cases — Who Deploys This, And What It Unlocks
+
+Pathogen Scout is purpose-built for **pre-visual crop biosecurity surveillance** — situations where the cost of a 24-hour delay is measured in hectares lost, and where existing ground pipelines simply can't move fast enough. Four concrete deployments, each pairing the *stakeholder* with the *technical capability the on-board agent unlocks*.
+
+#### 🌾 Wheat rust early warning (national biosecurity agencies)
+Yellow and stem rust spread across continents in days, riding wind currents from one growing region to the next. **Stakeholder:** national agriculture ministries, FAO regional offices, and crop insurers exposed to multi-billion-dollar yield losses. **What the agent unlocks:** sub-90-second alerts from orbit, with GPS-tagged hot spots and a drone-tasking command — fast enough to dispatch ground teams or fungicide sprays *before* the next wind event spreads spores beyond the initial focal area.
+
+#### 🍊 Citrus greening (HLB) containment (commercial groves & extension services)
+Huanglongbing is asymptomatic for months in early stages but devastates yields once visible. The red-edge (B8A) channel detects chlorophyll degradation in HLB-positive trees long before they're symptomatic in RGB imagery. **Stakeholder:** commercial citrus operators (Florida, Brazil, India), state-level agricultural extension offices, and HLB surveillance programs. **What the agent unlocks:** on-board separation of *true* HLB stress from drought-induced yellowing — the Tier-2 classifier that drought-rules-out is the entire point. Operators don't get a thousand false-positive alerts during dry spells.
+
+#### 🍌 Banana Panama disease (TR4) — quarantine zone monitoring
+TR4 is a soil-borne fungal pathogen with no cure; the only intervention is rapid quarantine. **Stakeholder:** plantation operators in TR4-affected regions (Australia, Mozambique, Latin America), national quarantine authorities, and global banana-supply-chain stakeholders. **What the agent unlocks:** continuous orbital surveillance of declared quarantine perimeters at sub-tile resolution, with autonomous escalation only on genuine anomalies — no ground-side human triage required for the 80% of an orbit spent out of contact with any station.
+
+#### 🍇 Vineyard powdery mildew & downy mildew detection (precision-ag operators)
+Mildews develop in localized humidity microclimates, often patchy across a single vineyard block — exactly the **patchy red-edge variance signature** Pathogen Scout's Tier-2 classifier was tuned to discriminate from uniform drought stress. **Stakeholder:** precision-agriculture firms serving wine regions (Napa, Bordeaux, Mendoza, Marlborough), and the vineyards that depend on tight spray-window timing for fungicide efficacy. **What the agent unlocks:** decision-grade, hectare-level alerts that integrate cleanly with existing precision-ag dashboards — no raw imagery to process, just an actionable AOI and a confidence score.
+
+> **The common thread:** every deployment above is bottlenecked today not by *imaging capability* but by **time-to-action.** Pathogen Scout collapses that latency by moving the decision into orbit — the Tactical Packet is already actionable the moment it touches the ground.
+
+---
+
 ## 🌐 Ground Segment — Where The Packets Land
 
 A satellite that emits decisions only matters if those decisions reach an operator. Pathogen Scout's Tactical Packets are deliberately schema-stable, ground-station-friendly JSON so they can be **ingested by any aerial-monitoring dashboard** — no bespoke decoder required.
