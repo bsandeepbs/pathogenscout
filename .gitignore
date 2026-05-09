@@ -9,3 +9,7 @@ data/output_packets/*.json
 data/sample_tiles/*.npz
 !data/sample_tiles/.gitkeep
 .DS_Store
+
+# Local-only: hackathon submission notes (drafts, Q&A, talking points)
+SUBMISSION_NOTES.md
+docs/submission/
