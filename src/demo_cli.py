@@ -250,12 +250,97 @@ def run_demo(tile_dir: Path, slow: float = 0.0) -> None:
     console.print()
 
 
+def _try_fetch_simsat_tiles(target_dir: Path, n: int = 4) -> list[Path] | None:
+    """If a local SimSat instance is up, pull `n` live tiles into target_dir.
+    Returns the list of saved paths on success, or None if SimSat is
+    unreachable / not configured (so the caller falls back to synthetic).
+    """
+    try:
+        from src.simsat_client import (
+            SimSatClient,
+            SimSatNoImageError,
+            SimSatUnavailableError,
+        )
+    except ImportError:
+        return None
+
+    client = SimSatClient()
+    try:
+        # Probe — the position endpoint is cheap and tells us SimSat is live.
+        pos = client.current_position()
+    except SimSatUnavailableError:
+        return None
+    except Exception as exc:
+        console.print(f"[yellow][simsat] probe failed: {exc}[/yellow]")
+        return None
+
+    console.print(Panel.fit(
+        Text.from_markup(
+            f"[bold green]✓[/bold green] [white]SimSat live[/white] at "
+            f"[cyan]{client.base_url}[/cyan] — fetching {n} real Sentinel-2 tiles "
+            f"[dim](B4 / B8 / B8A)[/dim]"
+        ),
+        border_style="green",
+    ))
+
+    target_dir.mkdir(parents=True, exist_ok=True)
+    saved: list[Path] = []
+    lon, lat, _alt = pos["lon-lat-alt"]
+    timestamp = pos["timestamp"]
+    for i in range(n):
+        # Walk a tiny grid around the satellite ground track so each tile
+        # is a *distinct* fetch but still in the current visibility window.
+        d_lat = lat + (i - n / 2) * 0.05
+        d_lon = lon + (i - n / 2) * 0.05
+        out = target_dir / f"simsat_{i:02d}_{d_lat:.3f}_{d_lon:.3f}.npz"
+        try:
+            tile = client.fetch_pathogen_scout_tile(
+                lat=d_lat, lon=d_lon, timestamp=timestamp,
+            )
+            tile.save_npz(out)
+            saved.append(out)
+        except SimSatNoImageError as exc:
+            console.print(f"[yellow][simsat] skip ({d_lat:.3f},{d_lon:.3f}): {exc}[/yellow]")
+
+    return saved or None
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Pathogen Scout — streaming demo.")
     parser.add_argument("--tiles", type=Path, default=config.ROOT / "data" / "sample_tiles")
     parser.add_argument("--slow", type=float, default=0.35,
                         help="Seconds to pause between tiles (set 0 to disable).")
+    parser.add_argument(
+        "--source",
+        choices=["auto", "synthetic", "simsat"],
+        default="auto",
+        help=(
+            "Tile source. 'simsat' = pull live tiles from the DPhi SimSat API "
+            "(requires `docker compose up` from DPhi-Space/SimSat). "
+            "'synthetic' = use the deterministic 8-tile demo set. "
+            "'auto' (default) = try SimSat first, fall back to synthetic."
+        ),
+    )
+    parser.add_argument("--n-simsat", type=int, default=4,
+                        help="Number of live SimSat tiles to fetch when --source uses simsat.")
     args = parser.parse_args()
+
+    if args.source in ("simsat", "auto"):
+        live = _try_fetch_simsat_tiles(args.tiles, n=args.n_simsat)
+        if live:
+            run_demo(args.tiles, slow=args.slow)
+            return
+        if args.source == "simsat":
+            console.print(
+                "[red]SimSat is not reachable at http://localhost:9005. "
+                "Start it with `docker compose up` in the DPhi-Space/SimSat repo, "
+                "or rerun with --source synthetic.[/red]"
+            )
+            sys.exit(2)
+        console.print(
+            "[dim][simsat] not reachable — falling back to synthetic demo tiles.[/dim]"
+        )
+
     run_demo(args.tiles, slow=args.slow)
 
 

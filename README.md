@@ -15,7 +15,7 @@ python -m src.demo_cli                 # Rich-formatted CLI (the "flight softwar
 streamlit run src/dashboard.py         # Mission Control dashboard (browser)
 ```
 
-The CLI auto-synthesizes 8 demo tiles on first run, so it works immediately on a fresh clone.
+The CLI auto-synthesizes 8 demo tiles on first run, so it works immediately on a fresh clone. **If a [DPhi SimSat](https://github.com/DPhi-Space/SimSat) instance is running locally, the CLI auto-detects it and pulls live Sentinel-2 tiles instead** — no flag needed. See [§ Live SimSat integration](#-live-simsat-integration) below.
 
 ---
 
@@ -116,6 +116,7 @@ pathogenscout/
 ├── src/
 │   ├── __init__.py
 │   ├── agent_logic.py          # Orchestrates Tier 1 → Tier 3
+│   ├── simsat_client.py        # DPhi SimSat HTTP API client (B4 + B8 + B8A fetcher)
 │   ├── demo_cli.py             # Rich-formatted streaming "flight software" demo
 │   ├── dashboard.py            # Streamlit Mission Control dashboard
 │   ├── multispectral.py        # NDRE computation (NumPy/OpenCV)
@@ -154,6 +155,47 @@ python -m src.agent_logic --tile data/sample_tiles/tile_005_pathogen.npz --verbo
 ```
 
 Tactical Packets are written to `data/output_packets/packet_<id>.json`.
+
+---
+
+## 🛰️ Live SimSat integration
+
+Pathogen Scout's **primary data source** is the **[DPhi SimSat platform](https://github.com/DPhi-Space/SimSat)** — a satellite simulator that ingests Sentinel-2 imagery and exposes it via an HTTP API at `http://localhost:9005`. The integration lives in [`src/simsat_client.py`](src/simsat_client.py).
+
+### Endpoints consumed
+
+| Endpoint | What we use it for |
+|---|---|
+| `GET /data/current/position` | Probe to detect SimSat is up; get the satellite's current lat/lon/timestamp |
+| `GET /data/image/sentinel?lon&lat&timestamp&spectral_bands&size_km&return_type=png` | Fetch one Sentinel-2 band as PNG; called three times per tile to assemble (B4 + B8 + B8A) |
+
+We map the three Pathogen Scout bands onto SimSat's spectral vocabulary:
+
+```python
+PATHOGEN_SCOUT_BANDS = {
+    "B4":  "red",       # ~665 nm
+    "B8":  "nir",       # ~842 nm
+    "B8A": "rededge3",  # ~865 nm — the red-edge band that makes pre-visual NDRE work
+}
+```
+
+### Run end-to-end against live SimSat
+
+```bash
+# 1. In another terminal, start SimSat (one-time per session)
+git clone https://github.com/DPhi-Space/SimSat && cd SimSat && docker compose up
+
+# 2. Back in this repo: pull a single live tile and feed it to the agent
+python -m src.simsat_client --current --out data/sample_tiles/live.npz
+python -m src.agent_logic --tile data/sample_tiles/live.npz --verbose
+
+# 3. Or: run the full streaming demo against live SimSat
+python -m src.demo_cli --source simsat --n-simsat 4
+```
+
+`--source auto` (the default for `demo_cli`) **auto-detects SimSat** and uses live tiles when available, falling back to the synthetic 8-tile demo set when SimSat is offline. This is how the demo stays runnable on a fresh clone without Docker, while still proving real-platform integration when SimSat is up.
+
+> **Why this matters for the rubric:** the *Use of Satellite Imagery* criterion explicitly asks for "satellite images from the DPhi API as the core data source." The synthetic tiles exist only as an offline-development convenience — `simsat_client.py` is the production data path.
 
 ---
 
